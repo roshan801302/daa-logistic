@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Logistics Optimization Platform</title>
+  <link rel="stylesheet" href="style.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <!-- Leaflet.js (Free, Open Source, No API Key Required) -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+</head>
+<body>
+
+<!-- Sidebar Navigation -->
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-icon">🚚</div>
+    <div class="logo-text">
+      <span class="logo-title">LogisPro</span>
+      <span class="logo-sub">Optimizer v1.0</span>
+    </div>
+  </div>
+  <nav class="sidebar-nav">
+    <button class="nav-btn active" data-panel="dashboard" id="nav-dashboard">
+      <span class="nav-icon">📊</span><span>Dashboard</span>
+    </button>
+    <button class="nav-btn" data-panel="requests" id="nav-requests">
+      <span class="nav-icon">📦</span><span>Delivery Requests</span>
+    </button>
+    <button class="nav-btn" data-panel="routes" id="nav-routes">
+      <span class="nav-icon">🗺️</span><span>Route Planner</span>
+    </button>
+    <button class="nav-btn" data-panel="analytics" id="nav-analytics">
+      <span class="nav-icon">📈</span><span>Sort Analytics</span>
+    </button>
+  </nav>
+  <div class="sidebar-footer">
+    <div class="status-dot online"></div>
+    <span>System Online</span>
+  </div>
+</aside>
+
+<!-- Main Content -->
+<div class="main-wrapper">
+  <!-- Topbar -->
+  <header class="topbar">
+    <button class="topbar-menu-btn" id="toggleSidebar">☰</button>
+    <div class="topbar-title" id="panel-title">Dashboard Overview</div>
+    <div class="topbar-right">
+      <div class="topbar-search">
+        <input type="text" placeholder="Search deliveries..." id="globalSearch">
+        <span>🔍</span>
+      </div>
+      <div class="topbar-alert" id="alertBell">🔔 <span class="badge" id="alertCount">0</span></div>
+      <div class="topbar-time" id="clock"></div>
+    </div>
+  </header>
+
+  <main class="content-area">
+
+    <!-- ======== DASHBOARD PANEL ======== -->
+    <section class="panel active" id="panel-dashboard">
+      <div class="stats-grid">
+        <div class="stat-card blue">
+          <div class="stat-icon">📦</div>
+          <div class="stat-info"><div class="stat-value" id="s-total">0</div><div class="stat-label">Total Requests</div></div>
+          <div class="stat-trend" id="st-total">+0</div>
+        </div>
+        <div class="stat-card green">
+          <div class="stat-icon">✅</div>
+          <div class="stat-info"><div class="stat-value" id="s-delivered">0</div><div class="stat-label">Delivered</div></div>
+          <div class="stat-trend" id="st-delivered">+0</div>
+        </div>
+        <div class="stat-card yellow">
+          <div class="stat-icon">⏳</div>
+          <div class="stat-info"><div class="stat-value" id="s-pending">0</div><div class="stat-label">Pending</div></div>
+          <div class="stat-trend" id="st-pending">--</div>
+        </div>
+        <div class="stat-card red">
+          <div class="stat-icon">🚨</div>
+          <div class="stat-info"><div class="stat-value" id="s-urgent">0</div><div class="stat-label">Urgent</div></div>
+          <div class="stat-trend" id="st-urgent">!</div>
+        </div>
+      </div>
+
+      <div class="dash-split">
+        <div class="card wide">
+          <div class="card-header">
+            <span>📋 Priority Queue (Top Deliveries)</span>
+            <span class="badge-algo">Heap Sort</span>
+          </div>
+          <table class="data-table" id="priority-table">
+            <thead><tr><th>#</th><th>ID</th><th>Deadline</th><th>Priority</th><th>Weight</th><th>Distance</th><th>Status</th></tr></thead>
+            <tbody id="priority-tbody"></tbody>
+          </table>
+        </div>
+        <div class="card narrow">
+          <div class="card-header"><span>🧭 Algorithm Performance</span></div>
+          <div class="perf-chart" id="perf-bars"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ======== DELIVERY REQUESTS PANEL ======== -->
+    <section class="panel" id="panel-requests">
+      <div class="panel-toolbar">
+        <div class="toolbar-left">
+          <button class="btn btn-primary" id="addRequestBtn">+ New Request</button>
+          <button class="btn btn-secondary" id="generateBtn">⚡ Generate 20 Random</button>
+        </div>
+        <div class="toolbar-right">
+          <label>Sort by:
+            <select id="sortSelect">
+              <option value="deadline">Deadline (Merge Sort)</option>
+              <option value="priority">Priority (Quick Sort)</option>
+              <option value="heap">Priority Queue (Heap Sort)</option>
+            </select>
+          </label>
+          <button class="btn btn-accent" id="sortBtn">Sort Now</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <span>📦 Delivery Requests</span>
+          <span class="badge-algo" id="sort-badge">Merge Sort</span>
+        </div>
+        <table class="data-table full" id="requests-table">
+          <thead><tr><th>#</th><th>ID</th><th>Weight (kg)</th><th>Deadline (hr)</th><th>Priority</th><th>Distance (km)</th><th>Status</th><th>Actions</th></tr></thead>
+          <tbody id="requests-tbody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ======== ROUTE PLANNER PANEL ======== -->
+    <section class="panel" id="panel-routes">
+      <!-- Algorithm Selector Toolbar -->
+      <div class="algo-toolbar">
+        <div class="algo-tabs" id="algoTabs">
+          <button class="algo-tab active" data-algo="dijkstra">🔷 Dijkstra</button>
+          <button class="algo-tab" data-algo="ch">⚡ CH</button>
+          <button class="algo-tab" data-algo="crp">🧩 CRP</button>
+          <button class="algo-tab" data-algo="tabu">🚫 Tabu Search</button>
+          <button class="algo-tab" data-algo="aco">🐜 ACO</button>
+          <button class="algo-tab special" data-algo="all">📊 Compare All</button>
+        </div>
+        <div class="algo-actions">
+          <button class="btn btn-primary btn-sm" id="calcRouteBtn">▶ Run Algorithm</button>
+          <button class="btn btn-secondary btn-sm" id="clearRouteBtn">Clear</button>
+        </div>
+      </div>
+      <div class="dash-split">
+        <div class="card map-panel">
+          <div class="card-header">
+            <span>🗺️ Live Route MStreetMapap (Open)</span>
+            <span class="badge-algo" id="active-algo-badge">Dijkstra</span>
+          </div>
+          <div id="google-map"></div>
+          <div class="map-legend">
+            <span class="legend-item"><span class="leg-dot green"></span> Warehouse</span>
+            <span class="legend-item"><span class="leg-dot blue"></span> Dijkstra / CH</span>
+            <span class="legend-item"><span class="leg-dot purple"></span> CRP</span>
+            <span class="legend-item"><span class="leg-dot yellow"></span> Tabu Search</span>
+            <span class="legend-item"><span class="leg-dot red"></span> ACO</span>
+          </div>
+        </div>
+        <div class="card narrow route-info-panel">
+          <div class="card-header"><span>📍 Route Details</span></div>
+          <div class="route-detail-list" id="route-list">
+            <div class="route-placeholder">Select an algorithm and click <b>Run Algorithm</b> to compute the delivery route.</div>
+          </div>
+          <div class="route-summary" id="route-summary" style="display:none;">
+            <div class="summary-row"><span>Distance:</span><span id="route-total-dist">--</span></div>
+            <div class="summary-row"><span>Est. Time:</span><span id="route-total-time">--</span></div>
+            <div class="summary-row"><span>Stops:</span><span id="route-stops">--</span></div>
+            <div class="summary-row"><span>Runtime:</span><span id="route-runtime">--</span></div>
+            <div class="summary-row"><span>Algorithm:</span><span class="badge-algo" id="route-algo-name">--</span></div>
+          </div>
+          <!-- Compare All results table -->
+          <div id="compare-results" style="display:none;">
+            <div class="card-header" style="border-top:1px solid var(--card-border)"><span>📊 Algorithm Comparison</span></div>
+            <table class="data-table" id="compare-table">
+              <thead><tr><th>Algorithm</th><th>Distance</th><th>Runtime</th><th>Quality</th></tr></thead>
+              <tbody id="compare-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <!-- Algo info cards -->
+      <div class="algo-info-grid" id="algo-info-grid">
+        <div class="algo-info-card" data-info="dijkstra">
+          <div class="ai-title">🔷 Dijkstra</div>
+          <div class="ai-complexity">O((V+E) log V)</div>
+          <div class="ai-desc">Classic greedy shortest-path. Uses a priority queue to relax edges. Guarantees optimal paths on non-negative weighted graphs.</div>
+        </div>
+        <div class="algo-info-card" data-info="ch">
+          <div class="ai-title">⚡ CH</div>
+          <div class="ai-complexity">O(n log n) query</div>
+          <div class="ai-desc">Contraction Hierarchies. Preprocesses graph by contracting low-importance nodes and adding shortcut edges. Bidirectional Dijkstra on the hierarchy.</div>
+        </div>
+        <div class="algo-info-card" data-info="crp">
+          <div class="ai-title">🧩 CRP</div>
+          <div class="ai-complexity">O(B²) customization</div>
+          <div class="ai-desc">Customizable Route Planning. Partitions the graph into cells/regions. Precomputes boundary node paths; customization adapts to changing edge weights.</div>
+        </div>
+        <div class="algo-info-card" data-info="tabu">
+          <div class="ai-title">🚫 Tabu Search</div>
+          <div class="ai-complexity">O(n² × iter)</div>
+          <div class="ai-desc">Metaheuristic for TSP/VRP. Uses 2-opt swaps to improve tour. A tabu list prevents revisiting recent moves, escaping local optima.</div>
+        </div>
+        <div class="algo-info-card" data-info="aco">
+          <div class="ai-title">🐜 ACO</div>
+          <div class="ai-complexity">O(ants × n² × iter)</div>
+          <div class="ai-desc">Ant Colony Optimization. Multiple ants construct tours guided by pheromone trails. Good tours reinforce pheromones; trails evaporate over time.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ======== ANALYTICS PANEL ======== -->
+    <section class="panel" id="panel-analytics">
+      <div class="analytics-grid">
+        <div class="card analytics-main">
+          <div class="card-header"><span>⏱️ Runtime Complexity Analysis</span></div>
+          <div class="complexity-chart-container">
+            <canvas id="complexityCanvas" width="720" height="340"></canvas>
+          </div>
+          <div class="complexity-legend">
+            <div class="legend-item2 merge">Merge Sort — O(n log n) Stable</div>
+            <div class="legend-item2 quick">Quick Sort — O(n log n) Unstable</div>
+            <div class="legend-item2 heap">Heap Sort — O(n log n) Unstable</div>
+            <div class="legend-item2 bubble">Bubble Sort — O(n²) Stable</div>
+          </div>
+        </div>
+        <div class="card analytics-side">
+          <div class="card-header"><span>📘 Stability Impact</span></div>
+          <div class="stability-demo" id="stability-demo">
+            <div class="stab-label">5 packages with same deadline — sorted by each algorithm:</div>
+            <div class="stab-row">
+              <div class="stab-algo stable-tag">Merge Sort (Stable)</div>
+              <div class="stab-items" id="stab-merge"></div>
+            </div>
+            <div class="stab-row">
+              <div class="stab-algo unstable-tag">Quick Sort (Unstable)</div>
+              <div class="stab-items" id="stab-quick"></div>
+            </div>
+            <div class="stab-note">⚠️ Stable sort preserves arrival order for equal deadlines — critical for delivery fairness.</div>
+          </div>
+          <div class="card-header mt"><span>🏷️ O(n²) vs O(n log n)</span></div>
+          <div class="complexity-compare" id="complexity-compare"></div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<!-- Add Request Modal -->
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <div class="modal-header"><span>Add New Delivery Request</span><button class="modal-close" id="closeModal">✕</button></div>
+    <div class="modal-body">
+      <div class="form-row">
+        <label>Package ID <input type="text" id="f-id" placeholder="e.g. PKG-001"></label>
+        <label>Weight (kg) <input type="number" id="f-weight" placeholder="e.g. 12.5" step="0.1"></label>
+      </div>
+      <div class="form-row">
+        <label>Deadline (hours) <input type="number" id="f-deadline" placeholder="e.g. 24"></label>
+        <label>Priority (1–5, 5 = highest) <input type="number" id="f-priority" placeholder="e.g. 3" min="1" max="5"></label>
+      </div>
+      <div class="form-row">
+        <label>Distance (km) <input type="number" id="f-distance" placeholder="e.g. 45.0" step="0.1"></label>
+        <label>Destination City
+          <select id="f-city">
+            <option>Mumbai</option><option>Delhi</option><option>Bangalore</option><option>Chennai</option>
+            <option>Hyderabad</option><option>Ahmedabad</option><option>Kolkata</option><option>Pune</option>
+          </select>
+        </label>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" id="cancelModal">Cancel</button>
+      <button class="btn btn-primary" id="confirmAdd">Add Request</button>
+    </div>
+  </div>
+</div>
+
+<script src="routing_algorithms.js"></script>
+<script src="app.js?v=3"></script>
+</body>
+</html>
