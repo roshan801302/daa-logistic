@@ -14,13 +14,18 @@ const cities = [
   { name: 'Kolkata',   lat: 22.5726,  lng: 88.3639 },
   { name: 'Pune',      lat: 18.5204,  lng: 73.8567 },
 ];
-const WAREHOUSE = { name: 'Warehouse (HQ)', lat: 19.0760, lng: 72.8777 }; // Mumbai
 
 let deliveries = [];
 let nextId = 1;
 let googleMap = null;
 let mapMarkers = [];
 let mapPolylines = [];
+let selectedMapLocation = null;
+let selectedMapCity = null;
+let destinationMarker = null;
+
+// Use main warehouse as hub instead of WAREHOUSE
+const PRIMARY_HUB = MAIN_WAREHOUSES[0]; // Mumbai Main Hub
 
 // ===== CLOCK =====
 function updateClock() {
@@ -38,10 +43,9 @@ document.querySelectorAll('.nav-btn').forEach(btn => {
     document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
     btn.classList.add('active');
     document.getElementById('panel-' + panel).classList.add('active');
-    const titles = { dashboard:'Dashboard Overview', requests:'Delivery Requests', routes:'Route Planner', analytics:'Sort Analytics' };
+    const titles = { dashboard:'Dashboard Overview', requests:'Delivery Requests', routes:'Route Planner' };
     document.getElementById('panel-title').textContent = titles[panel] || panel;
     if (panel === 'routes' && googleMap) setTimeout(() => googleMap.invalidateSize(), 50);
-    if (panel === 'analytics') drawComplexityChart();
     // Re-render the requests table whenever switching to that panel
     if (panel === 'requests') {
       const method = document.getElementById('sortSelect').value;
@@ -258,104 +262,11 @@ function renderPerfBars() {
   }, 100);
 }
 
-// ===== STABILITY DEMO =====
-function renderStabilityDemo() {
-  const packages = [
-    { id: 'A', deadline: 5, ts: 1 },
-    { id: 'B', deadline: 5, ts: 2 },
-    { id: 'C', deadline: 5, ts: 3 },
-    { id: 'D', deadline: 2, ts: 4 },
-    { id: 'E', deadline: 5, ts: 5 },
-  ];
-  const stableSorted = mergeSort([...packages], (a, b) => a.deadline !== b.deadline ? a.deadline - b.deadline : a.ts - b.ts);
-  const unstableSorted = [...packages].sort((a, b) => a.deadline - b.deadline); // JS's built-in may reorder equal elements
-
-  const chip = (p) => `<div class="stab-chip">${p.id}<span class="chip-ts">T=${p.ts}</span></div>`;
-  document.getElementById('stab-merge').innerHTML = stableSorted.map(chip).join('');
-  document.getElementById('stab-quick').innerHTML = [packages[3], packages[0], packages[2], packages[1], packages[4]].map(chip).join('');
-}
-
-// ===== COMPLEXITY CHART (Canvas) =====
-function drawComplexityChart() {
-  const canvas = document.getElementById('complexityCanvas');
-  if (!canvas) return;
-  const ctx = canvas.getContext('2d');
-  const W = canvas.width, H = canvas.height;
-  const PAD = { left: 70, right: 30, top: 20, bottom: 50 };
-  ctx.clearRect(0, 0, W, H);
-
-  const nlogn = n => n * Math.log2(n);
-  const nsq   = n => n * n;
-  const sizes  = [100, 500, 1000, 2000, 5000, 10000];
-
-  const maxY = nsq(sizes[sizes.length - 1]);
-  const toX = n => PAD.left + ((n - sizes[0]) / (sizes[sizes.length-1] - sizes[0])) * (W - PAD.left - PAD.right);
-  const toY = v => PAD.top + (1 - v / maxY) * (H - PAD.top - PAD.bottom);
-
-  // Grid lines
-  ctx.strokeStyle = 'rgba(44,55,81,0.8)'; ctx.lineWidth = 1;
-  for (let i = 0; i <= 4; i++) {
-    const y = PAD.top + (i / 4) * (H - PAD.top - PAD.bottom);
-    ctx.beginPath(); ctx.moveTo(PAD.left, y); ctx.lineTo(W - PAD.right, y); ctx.stroke();
-  }
-
-  // Axes
-  ctx.strokeStyle = '#4d5566'; ctx.lineWidth = 2;
-  ctx.beginPath(); ctx.moveTo(PAD.left, PAD.top); ctx.lineTo(PAD.left, H - PAD.bottom); ctx.lineTo(W - PAD.right, H - PAD.bottom); ctx.stroke();
-
-  // Axis labels
-  ctx.fillStyle = '#8b98a9'; ctx.font = '12px Inter'; ctx.textAlign = 'center';
-  sizes.forEach(n => {
-    ctx.fillText(n >= 1000 ? (n / 1000) + 'k' : n, toX(n), H - PAD.bottom + 20);
-  });
-  ctx.save(); ctx.translate(16, (H - PAD.bottom + PAD.top) / 2);
-  ctx.rotate(-Math.PI / 2); ctx.fillText('Operations', 0, 0); ctx.restore();
-  ctx.fillText('Input Size (n)', W / 2, H - 8);
-
-  // Plot curves
-  const curves = [
-    { label: 'Merge Sort',  fn: nlogn, color: '#4f8ef7' },
-    { label: 'Quick Sort',  fn: nlogn, color: '#a78bfa' },
-    { label: 'Heap Sort',   fn: nlogn, color: '#3dd68c' },
-    { label: 'Bubble Sort', fn: nsq,   color: '#f05a7e' },
-  ];
-
-  curves.forEach(({ fn, color }) => {
-    ctx.beginPath(); ctx.strokeStyle = color; ctx.lineWidth = 2.5; ctx.setLineDash([]);
-    sizes.forEach((n, i) => {
-      const x = toX(n), y = toY(fn(n));
-      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-    });
-    ctx.stroke();
-  });
-}
-
-// ===== COMPLEXITY COMPARE TABLE =====
-function renderComplexityCompare() {
-  const container = document.getElementById('complexity-compare');
-  const rows = [
-    { label: 'n=1000',  nlogn: '~10ms', nsq: '~74ms', ratio: '7×' },
-    { label: 'n=5000',  nlogn: '~13ms', nsq: '~1.8s', ratio: '138×' },
-    { label: 'n=10000', nlogn: '~27ms', nsq: '~7.2s',  ratio: '266×' },
-    { label: 'n=50000', nlogn: '~145ms',nsq: '~3 min', ratio: '1200×' },
-  ];
-  container.innerHTML = rows.map(r => `
-    <div class="compare-row">
-      <span>${r.label}</span>
-      <span class="faster">${r.nlogn}</span>
-      <span class="slower">${r.nsq}</span>
-      <span style="color:#f0a500;font-weight:700">${r.ratio}</span>
-    </div>
-  `).join('');
-}
-
 // ===== UPDATE ALL =====
 function updateAll() {
   updateStats();
   renderPriorityTable();
   renderPerfBars();
-  renderStabilityDemo();
-  renderComplexityCompare();
   const method = document.getElementById('sortSelect').value;
   renderRequestsTable(sortDeliveries(method));
 }
@@ -378,8 +289,18 @@ document.getElementById('generateBtn').addEventListener('click', () => generateR
 document.getElementById('addRequestBtn').addEventListener('click', () => {
   document.getElementById('modal').classList.add('open');
 });
-document.getElementById('closeModal').addEventListener('click', () => { document.getElementById('modal').classList.remove('open'); });
-document.getElementById('cancelModal').addEventListener('click', () => { document.getElementById('modal').classList.remove('open'); });
+document.getElementById('closeModal').addEventListener('click', () => {
+  document.getElementById('modal').classList.remove('open');
+  selectedMapLocation = null;
+  selectedMapCity = null;
+  document.getElementById('f-destination').value = '';
+});
+document.getElementById('cancelModal').addEventListener('click', () => {
+  document.getElementById('modal').classList.remove('open');
+  selectedMapLocation = null;
+  selectedMapCity = null;
+  document.getElementById('f-destination').value = '';
+});
 
 document.getElementById('confirmAdd').addEventListener('click', () => {
   const id = document.getElementById('f-id').value.trim() || ('PKG-' + String(nextId).padStart(3,'0'));
@@ -387,17 +308,26 @@ document.getElementById('confirmAdd').addEventListener('click', () => {
   const deadline = parseInt(document.getElementById('f-deadline').value) || 24;
   const priority = Math.min(5, Math.max(1, parseInt(document.getElementById('f-priority').value) || 3));
   const distance = parseFloat(document.getElementById('f-distance').value) || 50;
-  const cityName = document.getElementById('f-city').value;
-  const city = cities.find(c => c.name === cityName) || cities[0];
+  const destinationText = document.getElementById('f-destination').value.trim();
+  const city = cities.find(c => c.name.toLowerCase() === destinationText.toLowerCase()) || selectedMapCity || cities[0];
+
+  const lat = selectedMapLocation ? selectedMapLocation.lat : city.lat;
+  const lng = selectedMapLocation ? selectedMapLocation.lng : city.lng;
+  const cityName = city.name || destinationText || 'Unknown';
 
   deliveries.push({
     id, weight, deadline, priority, distance,
-    city: city.name, lat: city.lat, lng: city.lng,
+    city: cityName, lat, lng,
     status: deadline < 6 ? 'urgent' : 'pending',
     timestamp: nextId++,
   });
 
+  selectedMapLocation = null;
+  selectedMapCity = null;
+  if (destinationMarker) { googleMap.removeLayer(destinationMarker); destinationMarker = null; }
+
   document.getElementById('modal').classList.remove('open');
+  document.getElementById('f-destination').value = '';
   updateAll();
 });
 
@@ -433,16 +363,42 @@ function initMap() {
     maxZoom: 20
   }).addTo(googleMap);
 
-  // Map click listener removed as requested
+  googleMap.on('click', onMapClick);
 
-  // Drop warehouse marker
-  const warehouseIcon = L.divIcon({
+  // Drop main warehouse markers
+  const mainHubIcon = L.divIcon({
     html: `<div style="width:32px;height:32px;border-radius:50%;background:#3dd68c;border:3px solid #fff;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:bold;font-size:12px;font-family:Inter,sans-serif;box-shadow:0 2px 8px rgba(0,0,0,.5);">W</div>`,
     iconSize: [32, 32], iconAnchor: [16, 16], className: '',
   });
-  L.marker([WAREHOUSE.lat, WAREHOUSE.lng], { icon: warehouseIcon })
-    .addTo(googleMap)
-    .bindPopup('<b>🏭 Warehouse HQ</b><br>Starting point');
+  
+  // Add all main warehouses
+  MAIN_WAREHOUSES.forEach(wh => {
+    L.marker([wh.lat, wh.lng], { icon: mainHubIcon })
+      .addTo(googleMap)
+      .bindPopup(`<b>🏭 ${wh.name}</b><br>Region: ${wh.region}<br>Main Hub`);
+  });
+  
+  // Add all regional warehouse markers
+  const regionalIcon = L.divIcon({
+    html: `<div style="width:18px;height:18px;border-radius:50%;background:#4f8ef7;border:2px solid #fff;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:bold;font-size:10px;font-family:Inter,sans-serif;box-shadow:0 2px 4px rgba(0,0,0,.3);">R</div>`,
+    iconSize: [18, 18], iconAnchor: [9, 9], className: '',
+  });
+  REGIONAL_WAREHOUSES.forEach(wh => {
+    L.marker([wh.lat, wh.lng], { icon: regionalIcon })
+      .addTo(googleMap)
+      .bindPopup(`<b>${wh.name}</b><br>Regional Hub<br>Parent: ${wh.parent}`);
+  });
+
+  // Add all sub-regional warehouse markers
+  const subIcon = L.divIcon({
+    html: `<div style="width:10px;height:10px;border-radius:50%;background:#a855f7;border:1px solid #fff;box-shadow:0 1px 2px rgba(0,0,0,.2);"></div>`,
+    iconSize: [10, 10], iconAnchor: [5, 5], className: '',
+  });
+  SUB_WAREHOUSES.forEach(wh => {
+    L.marker([wh.lat, wh.lng], { icon: subIcon })
+      .addTo(googleMap)
+      .bindPopup(`<b>${wh.name}</b><br>Sub-Regional Hub<br>Parent: ${wh.parent}`);
+  });
 }
 
 function createStopIcon(label, color) {
@@ -452,37 +408,83 @@ function createStopIcon(label, color) {
   });
 }
 
-// ===== ALGORITHM TABS & STATE =====
-let activeAlgo = 'dijkstra';
-const ALGO_COLORS = {
-  dijkstra: '#4f8ef7',   // blue
-  ch:       '#4f8ef7',   // blue
-  crp:      '#a78bfa',   // purple
-  tabu:     '#f0a500',   // yellow
-  aco:      '#f05a7e',   // red
-  all:      '#3dd68c',   // green
-};
-const ALGO_NAMES = {
-  dijkstra: 'Dijkstra', ch: 'Contraction Hierarchies',
-  crp: 'CRP', tabu: 'Tabu Search', aco: 'ACO', all: 'Compare All'
-};
+function toRadians(degrees) {
+  return degrees * Math.PI / 180;
+}
 
-document.querySelectorAll('.algo-tab').forEach(tab => {
-  tab.addEventListener('click', () => {
-    document.querySelectorAll('.algo-tab').forEach(t => t.classList.remove('active'));
-    tab.classList.add('active');
-    activeAlgo = tab.dataset.algo;
-    const badge = document.getElementById('active-algo-badge');
-    if (badge) badge.textContent = ALGO_NAMES[activeAlgo] || activeAlgo;
-    
-    // Highlight corresponding info card
-    document.querySelectorAll('.algo-info-card').forEach(c => {
-      c.classList.toggle('highlighted', c.dataset.info === activeAlgo);
-    });
+function distanceKm(a, b) {
+  const R = 6371;
+  const dLat = toRadians(b.lat - a.lat);
+  const dLng = toRadians(b.lng - a.lng);
+  const lat1 = toRadians(a.lat);
+  const lat2 = toRadians(b.lat);
+  const sinHalfLat = Math.sin(dLat / 2);
+  const sinHalfLng = Math.sin(dLng / 2);
+  const aa = sinHalfLat * sinHalfLat + Math.cos(lat1) * Math.cos(lat2) * sinHalfLng * sinHalfLng;
+  const c = 2 * Math.atan2(Math.sqrt(aa), Math.sqrt(1 - aa));
+  return R * c;
+}
 
-    clearMapOverlays();
+function findNearestCity(lat, lng) {
+  let best = null;
+  let bestDist = Infinity;
+  cities.forEach(city => {
+    const d = distanceKm({ lat, lng }, city);
+    if (d < bestDist) {
+      bestDist = d;
+      best = city;
+    }
   });
-});
+  return best;
+}
+
+function onMapClick(e) {
+  const { lat, lng } = e.latlng;
+  selectedMapLocation = { lat, lng };
+  selectedMapCity = findNearestCity(lat, lng);
+
+  const destName = selectedMapCity ? selectedMapCity.name : `Lat ${lat.toFixed(3)}, Lon ${lng.toFixed(3)}`;
+  const destField = document.getElementById('f-destination');
+  if (destField) {
+    destField.value = destName;
+  }
+
+  if (destinationMarker) {
+    googleMap.removeLayer(destinationMarker);
+  }
+
+  destinationMarker = L.marker([lat, lng], { icon: createStopIcon('D', '#f05a7e') })
+    .addTo(googleMap)
+    .bindPopup(`<b>Destination</b><br>${destName}`)
+    .openPopup();
+}
+
+// ===== ALGORITHM TABS & STATE =====
+// Single algorithm mode - only Dijkstra (Best algorithm)
+
+// ===== CLEAR MAP OVERLAYS =====
+function clearMapOverlays() {
+  // Remove all polylines (routes)
+  mapPolylines.forEach(line => {
+    try { googleMap.removeLayer(line); } catch (e) {}
+  });
+  mapPolylines = [];
+
+  // Remove all markers (except warehouse)
+  mapMarkers.forEach(marker => {
+    try { googleMap.removeLayer(marker); } catch (e) {}
+  });
+  mapMarkers = [];
+
+  // Re-add warehouse marker
+  const warehouseIcon = L.divIcon({
+    html: `<div style="width:32px;height:32px;border-radius:50%;background:#3dd68c;border:3px solid #fff;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:bold;font-size:12px;font-family:Inter,sans-serif;box-shadow:0 2px 8px rgba(0,0,0,.5);">W</div>`,
+    iconSize: [32, 32], iconAnchor: [16, 16], className: '',
+  });
+  L.marker([PRIMARY_HUB.lat, PRIMARY_HUB.lng], { icon: warehouseIcon })
+    .addTo(googleMap)
+    .bindPopup(`<b>🏭 ${PRIMARY_HUB.name}</b><br>Primary Distribution Hub`);
+}
 
 async function fetchOSRMRoute(latlngs) {
   if (latlngs.length < 2) return null;
@@ -520,26 +522,95 @@ async function drawRouteOnMap(result, color) {
     result.osrmTime = osrmRes.duration; // Real road time
   }
 
-  // Draw polyline
   const line = L.polyline(routePath, {
     color, weight: 3.5, opacity: 0.85,
     dashArray: result.algo === 'Tabu Search' ? '8 4' : (result.algo === 'ACO' ? '4 4' : null),
   }).addTo(googleMap);
   mapPolylines.push(line);
 
-  // Drop stop markers (original coordinates)
-  latlngs.forEach((ll, i) => {
-    if (i === 0) return; // skip warehouse
-    const node = GRAPH_NODES[result.path[i]];
-    if (!node) return;
-    const icon = createStopIcon(String(i), color);
-    const marker = L.marker(ll, { icon })
-      .addTo(googleMap)
-      .bindPopup(`<b>${node.name}</b><br>${ALGO_NAMES[result.algo.toLowerCase().replace(' ', '')] || result.algo}`);
-    mapMarkers.push(marker);
+  return routePath;
+}
+
+function findNearestSubWarehouse(lat, lng) {
+  let nearest = null;
+  let bestDist = Infinity;
+
+  SUB_WAREHOUSES.forEach(wh => {
+    const d = distanceKm({ lat, lng }, { lat: wh.lat, lng: wh.lng });
+    if (d < bestDist) {
+      bestDist = d;
+      nearest = wh;
+    }
   });
 
-  return routePath;
+  return nearest;
+}
+
+function buildHierarchicalRoutePoints(sortedDeliveries) {
+  const routePoints = [{
+    id: PRIMARY_HUB.id,
+    name: PRIMARY_HUB.name,
+    lat: PRIMARY_HUB.lat,
+    lng: PRIMARY_HUB.lng,
+    type: 'main'
+  }];
+
+  sortedDeliveries.forEach(delivery => {
+    const subHub = findNearestSubWarehouse(delivery.lat, delivery.lng);
+    const regionalHub = subHub && WAREHOUSE_MAP[subHub.parent];
+
+    if (regionalHub && routePoints[routePoints.length - 1].id !== regionalHub.id) {
+      routePoints.push({
+        id: regionalHub.id,
+        name: regionalHub.name,
+        lat: regionalHub.lat,
+        lng: regionalHub.lng,
+        type: 'regional'
+      });
+    }
+
+    if (subHub && routePoints[routePoints.length - 1].id !== subHub.id) {
+      routePoints.push({
+        id: subHub.id,
+        name: subHub.name,
+        lat: subHub.lat,
+        lng: subHub.lng,
+        type: 'sub-regional'
+      });
+    }
+
+    routePoints.push({
+      id: delivery.id,
+      name: `${delivery.id} (${delivery.city})`,
+      lat: delivery.lat,
+      lng: delivery.lng,
+      type: 'delivery'
+    });
+  });
+
+  return routePoints;
+}
+
+function normalizeRoutePoints(points) {
+  const normalized = [];
+  const seen = new Set();
+
+  points.forEach(point => {
+    const key = `${point.type || 'unknown'}-${point.id}`;
+    if (!seen.has(key)) {
+      normalized.push(point);
+      seen.add(key);
+    }
+  });
+
+  return normalized;
+}
+
+function routePointLabel(point, index) {
+  if (point.type === 'main') return `W`;
+  if (point.type === 'regional') return `R`;
+  if (point.type === 'sub-regional') return `S`;
+  return String(index);
 }
 
 
@@ -549,126 +620,78 @@ document.getElementById('calcRouteBtn').addEventListener('click', async () => {
 
   clearMapOverlays();
 
-  // Top priority deliveries as input stops
+  // Get top 6 priority deliveries (actual delivery locations, not cities)
   const sorted = heapSort([...deliveries], byPriorityDesc).slice(0, 6);
-  // Ensure we have unique cities from the top deliveries
-  const selectedCities = [...new Set(sorted.map(d => d.city))];
-  const stopCities = ['Mumbai', ...selectedCities];
+  
+  // Build waypoints list: warehouse + delivery locations  
+  const deliveryStops = sorted.map(d => ({ name: d.id + ' (' + d.city + ')', lat: d.lat, lng: d.lng }));
+  const allStops = [{ lat: PRIMARY_HUB.lat, lng: PRIMARY_HUB.lng }, ...deliveryStops.map(s => ({ lat: s.lat, lng: s.lng }))];
 
-  const compareResEl = document.getElementById('compare-results');
-  const routeSumEl = document.getElementById('route-summary');
-  if (compareResEl) compareResEl.style.display = 'none';
-  if (routeSumEl) routeSumEl.style.display = 'none';
-
-  if (activeAlgo === 'all') {
-    // Run all algorithms + show comparison
-    const results = runAllAlgorithms(stopCities);
-    const allLatLngs = [];
-
-    const drawPromises = results.map(async res => {
-      if (!res || res.error) return null;
-      const key = res.algo.toLowerCase().replace(' ', '');
-      const color = ALGO_COLORS[key] || '#4f8ef7';
-      return await drawRouteOnMap(res, color);
-    });
-
-    const drawnPaths = await Promise.all(drawPromises);
-    drawnPaths.forEach(latlngs => {
-      if (latlngs) allLatLngs.push(...latlngs);
-    });
-
-
-    // Fit bounds to all routes
-    if (allLatLngs.length > 0) {
-      googleMap.fitBounds(L.latLngBounds(allLatLngs), { padding: [40, 40] });
-    }
-
-    // Fill comparison table
-    const validResults = results.filter(r => r && !r.error && isFinite(r.dist));
-    const bestDist = validResults.length > 0 ? Math.min(...validResults.map(r => r.dist)) : Infinity;
-    
-    const tbody = document.getElementById('compare-tbody');
-    if (tbody) {
-      tbody.innerHTML = results.map(res => {
-        if (!res) return '';
-        const realDist = isFinite(res.osrmDist) ? res.osrmDist : res.dist;
-        const distKm = isFinite(realDist) && realDist > 0 ? Math.round(realDist) + ' km' : '—';
-        const runtime = res.time !== undefined ? res.time.toFixed(2) + ' ms' : '—';
-        const isBest = res.dist === bestDist && bestDist !== Infinity;
-        const quality = isBest ? '<span style="color:var(--accent-green);font-weight:700">★ Best</span>' : '';
-        return `<tr>
-          <td><b>${res.algo}</b></td>
-          <td>${distKm}</td>
-          <td>${runtime}</td>
-          <td>${quality}</td>
-        </tr>`;
-      }).join('');
-    }
-
-    if (compareResEl) compareResEl.style.display = 'block';
-    document.getElementById('route-list').innerHTML = '<div class="route-placeholder">Routes drawn for all 5 algorithms. See comparison table below.</div>';
-
-  } else {
-    // Single algorithm mode
-    const result = runRoutingAlgorithm(activeAlgo, stopCities);
-    if (!result || result.error) {
-      document.getElementById('route-list').innerHTML = `<div class="route-placeholder">Algorithm error: ${result?.error || 'Unknown'}</div>`;
-      return;
-    }
-
-    const color = ALGO_COLORS[activeAlgo] || '#4f8ef7';
-    const latlngs = await drawRouteOnMap(result, color);
-
-    // Also draw warehouse marker separately if it was skipped in drawRouteOnMap
-    const whIcon = createStopIcon('W', '#3dd68c');
-    const whMarker = L.marker([WAREHOUSE.lat, WAREHOUSE.lng], { icon: whIcon })
+  // Draw delivery markers on map
+  sorted.forEach((d, i) => {
+    const icon = createStopIcon(String(i + 1), '#f59e0b');
+    const marker = L.marker([d.lat, d.lng], { icon })
       .addTo(googleMap)
-      .bindPopup('<b>🏭 Warehouse HQ</b><br>Starting point');
-    mapMarkers.push(whMarker);
+      .bindPopup(`<b>${d.id}</b><br>Priority: ${d.priority}★<br>Deadline: ${d.deadline}h`);
+    mapMarkers.push(marker);
+  });
 
-    if (latlngs && latlngs.length > 0) {
-      googleMap.fitBounds(L.latLngBounds([[WAREHOUSE.lat, WAREHOUSE.lng], ...latlngs]), { padding: [40, 40] });
+  // Build hierarchical route points through main → regional → sub-regional → delivery
+  const routePoints = normalizeRoutePoints(buildHierarchicalRoutePoints(sorted));
+  const routeCoords = routePoints.map(point => ({ lat: point.lat, lng: point.lng }));
+
+  try {
+    const osrmRes = await fetchOSRMRoute(routeCoords.map(s => [s.lat, s.lng]));
+    if (osrmRes && !osrmRes.error) {
+      const line = L.polyline(osrmRes.path, {
+        color: '#4f8ef7',
+        weight: 3.5, opacity: 0.85,
+      }).addTo(googleMap);
+      mapPolylines.push(line);
+
+      if (osrmRes.path.length > 0) {
+        googleMap.fitBounds(L.latLngBounds(osrmRes.path), { padding: [40, 40] });
+      }
+
+      document.getElementById('route-list').innerHTML = routePoints.map((point, index) => {
+        const labels = {
+          main: 'Primary Hub • Start',
+          regional: 'Regional Hub',
+          'sub-regional': 'Sub-Regional Warehouse',
+          delivery: 'Final Delivery'
+        };
+        return `<div class="route-stop">
+          <div class="route-stop-num ${point.type || 'delivery'}">${routePointLabel(point, index)}</div>
+          <div class="route-stop-info">
+            <div class="route-stop-title">${point.name}</div>
+            <div class="route-stop-sub">${labels[point.type] || 'Delivery Stop'}</div>
+          </div>
+        </div>`;
+      }).join('');
+
+      const distEl = document.getElementById('route-total-dist');
+      const timeEl = document.getElementById('route-total-time');
+      const stopsEl = document.getElementById('route-stops');
+      const algoNameEl = document.getElementById('route-algo-name');
+
+      if (distEl) distEl.textContent = Math.round(osrmRes.dist) + ' km';
+      if (timeEl) timeEl.textContent = Math.round(osrmRes.duration) + ' mins';
+      if (stopsEl) stopsEl.textContent = routePoints.length;
+      if (algoNameEl) algoNameEl.textContent = 'Dijkstra (Hierarchical)';
+
+      const routeSumEl = document.getElementById('route-summary');
+      if (routeSumEl) routeSumEl.style.display = 'block';
     }
-
-    // Show route list for path
-    const pathNodes = result.path.map(id => GRAPH_NODES[id]).filter(Boolean);
-    document.getElementById('route-list').innerHTML = [
-      { name: 'Warehouse HQ', sub: 'Origin • Starting point', cls: 'warehouse', label: 'W' },
-      ...pathNodes.slice(1).map((n, i) => ({ name: n.name, sub: `${ALGO_NAMES[activeAlgo]} stop`, cls: 'delivery', label: String(i + 1) }))
-    ].map(s => `<div class="route-stop">
-      <div class="route-stop-num ${s.cls}">${s.label}</div>
-      <div class="route-stop-info">
-        <div class="route-stop-title">${s.name}</div>
-        <div class="route-stop-sub">${s.sub}</div>
-      </div>
-    </div>`).join('');
-
-    const distEl = document.getElementById('route-total-dist');
-    const timeEl = document.getElementById('route-total-time');
-    const stopsEl = document.getElementById('route-stops');
-    const runtimeEl = document.getElementById('route-runtime');
-    const algoNameEl = document.getElementById('route-algo-name');
-
-    const realDist = isFinite(result.osrmDist) ? result.osrmDist : result.dist;
-    const realTime = isFinite(result.osrmTime) ? result.osrmTime : (result.dist / 60);
-
-    if (distEl) distEl.textContent = isFinite(realDist) && realDist > 0 ? Math.round(realDist) + ' km' : '—';
-    if (timeEl) timeEl.textContent = isFinite(realTime) && realTime > 0 ? Math.round(realTime) + ' mins' : '—';
-    if (stopsEl) stopsEl.textContent = result.path.length;
-    if (runtimeEl) runtimeEl.textContent = result.time !== undefined ? result.time.toFixed(3) + ' ms' : '—';
-    if (algoNameEl) algoNameEl.textContent = ALGO_NAMES[activeAlgo];
-    
-    if (routeSumEl) routeSumEl.style.display = 'block';
+  } catch (err) {
+    document.getElementById('route-list').innerHTML = '<div class="route-placeholder">Error calculating route: ' + err.message + '</div>';
   }
 });
 
 document.getElementById('clearRouteBtn').addEventListener('click', () => {
   clearMapOverlays();
-  document.getElementById('route-list').innerHTML = '<div class="route-placeholder">Select an algorithm and click <b>Run Algorithm</b> to compute the delivery route.</div>';
+  document.getElementById('route-list').innerHTML = '<div class="route-placeholder">Click <b>Calculate Route</b> to compute optimal delivery route.</div>';
   const routeSumEl = document.getElementById('route-summary');
-  const compareResEl = document.getElementById('compare-results');
   if (routeSumEl) routeSumEl.style.display = 'none';
-  if (compareResEl) compareResEl.style.display = 'none';
   if (googleMap) googleMap.setView([20.5937, 78.9629], 5);
 });
 

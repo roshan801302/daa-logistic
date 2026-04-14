@@ -31,9 +31,6 @@
     <button class="nav-btn" data-panel="routes" id="nav-routes">
       <span class="nav-icon">🗺️</span><span>Route Planner</span>
     </button>
-    <button class="nav-btn" data-panel="analytics" id="nav-analytics">
-      <span class="nav-icon">📈</span><span>Sort Analytics</span>
-    </button>
   </nav>
   <div class="sidebar-footer">
     <div class="status-dot online"></div>
@@ -134,120 +131,62 @@
 
     <!-- ======== ROUTE PLANNER PANEL ======== -->
     <section class="panel" id="panel-routes">
-      <!-- Algorithm Selector Toolbar -->
+      <!-- Single Algorithm: Dijkstra (Best Route) -->
       <div class="algo-toolbar">
-        <div class="algo-tabs" id="algoTabs">
-          <button class="algo-tab active" data-algo="dijkstra">🔷 Dijkstra</button>
-          <button class="algo-tab" data-algo="ch">⚡ CH</button>
-          <button class="algo-tab" data-algo="crp">🧩 CRP</button>
-          <button class="algo-tab" data-algo="tabu">🚫 Tabu Search</button>
-          <button class="algo-tab" data-algo="aco">🐜 ACO</button>
-          <button class="algo-tab special" data-algo="all">📊 Compare All</button>
-        </div>
         <div class="algo-actions">
-          <button class="btn btn-primary btn-sm" id="calcRouteBtn">▶ Run Algorithm</button>
+          <h3 style="margin:0;color:var(--text-primary)">🔷 Best Route Algorithm (Dijkstra)</h3>
+          <button class="btn btn-primary btn-sm" id="calcRouteBtn">▶ Calculate Route</button>
           <button class="btn btn-secondary btn-sm" id="clearRouteBtn">Clear</button>
         </div>
       </div>
       <div class="dash-split">
         <div class="card map-panel">
           <div class="card-header">
-            <span>🗺️ Live Route MStreetMapap (Open)</span>
-            <span class="badge-algo" id="active-algo-badge">Dijkstra</span>
+            <span>🗺️ Live Route Map - 834 Warehouses (5 Main + 36 Regional + 793 Sub)</span>
+            <span class="badge-algo">Dijkstra Optimization</span>
           </div>
+          <div class="map-instruction">Click map to select destination address for new requests. Shows optimal route through warehouse network.</div>
           <div id="google-map"></div>
           <div class="map-legend">
-            <span class="legend-item"><span class="leg-dot green"></span> Warehouse</span>
-            <span class="legend-item"><span class="leg-dot blue"></span> Dijkstra / CH</span>
-            <span class="legend-item"><span class="leg-dot purple"></span> CRP</span>
-            <span class="legend-item"><span class="leg-dot yellow"></span> Tabu Search</span>
-            <span class="legend-item"><span class="leg-dot red"></span> ACO</span>
+            <span class="legend-item"><span class="leg-dot green"></span> Main Hub (5)</span>
+            <span class="legend-item"><span class="leg-dot blue"></span> Regional Centers (36)</span>
+            <span class="legend-item"><span class="leg-dot purple"></span> District-Level Sub-Regional Hubs (793)</span>
+            <span class="legend-item"><span class="leg-dot orange"></span> Delivery Route</span>
           </div>
         </div>
         <div class="card narrow route-info-panel">
-          <div class="card-header"><span>📍 Route Details</span></div>
+          <div class="card-header"><span>📍 Route Details & Warehouse Network</span></div>
+          <div class="warehouse-stats">
+            <div class="stat-row"><span>Total Warehouses:</span><span class="label-value">834</span></div>
+            <div class="stat-row"><span>Main Hubs:</span><span class="label-value">5</span></div>
+            <div class="stat-row"><span>Regional Centers:</span><span class="label-value">36</span></div>
+            <div class="stat-row"><span>Sub-Regional:</span><span class="label-value">793</span></div>
+          </div>
+          <hr style="margin:12px 0;border:none;border-top:1px solid var(--card-border);">
           <div class="route-detail-list" id="route-list">
-            <div class="route-placeholder">Select an algorithm and click <b>Run Algorithm</b> to compute the delivery route.</div>
+            <div class="route-placeholder">Click <b>Calculate Route</b> to compute optimal delivery route.</div>
           </div>
           <div class="route-summary" id="route-summary" style="display:none;">
             <div class="summary-row"><span>Distance:</span><span id="route-total-dist">--</span></div>
             <div class="summary-row"><span>Est. Time:</span><span id="route-total-time">--</span></div>
             <div class="summary-row"><span>Stops:</span><span id="route-stops">--</span></div>
             <div class="summary-row"><span>Runtime:</span><span id="route-runtime">--</span></div>
-            <div class="summary-row"><span>Algorithm:</span><span class="badge-algo" id="route-algo-name">--</span></div>
-          </div>
-          <!-- Compare All results table -->
-          <div id="compare-results" style="display:none;">
-            <div class="card-header" style="border-top:1px solid var(--card-border)"><span>📊 Algorithm Comparison</span></div>
-            <table class="data-table" id="compare-table">
-              <thead><tr><th>Algorithm</th><th>Distance</th><th>Runtime</th><th>Quality</th></tr></thead>
-              <tbody id="compare-tbody"></tbody>
-            </table>
+            <div class="summary-row"><span>Algorithm:</span><span class="badge-algo" id="route-algo-name">Dijkstra</span></div>
           </div>
         </div>
       </div>
-      <!-- Algo info cards -->
-      <div class="algo-info-grid" id="algo-info-grid">
-        <div class="algo-info-card" data-info="dijkstra">
-          <div class="ai-title">🔷 Dijkstra</div>
-          <div class="ai-complexity">O((V+E) log V)</div>
-          <div class="ai-desc">Classic greedy shortest-path. Uses a priority queue to relax edges. Guarantees optimal paths on non-negative weighted graphs.</div>
+      <!-- Algorithm Info Card -->
+      <div class="algo-description-card">
+        <div class="ai-title">🔷 Dijkstra's Shortest Path Algorithm</div>
+        <div class="ai-info-row">
+          <span class="ai-label">Complexity:</span>
+          <span class="ai-value">O((V+E) log V)</span>
         </div>
-        <div class="algo-info-card" data-info="ch">
-          <div class="ai-title">⚡ CH</div>
-          <div class="ai-complexity">O(n log n) query</div>
-          <div class="ai-desc">Contraction Hierarchies. Preprocesses graph by contracting low-importance nodes and adding shortcut edges. Bidirectional Dijkstra on the hierarchy.</div>
+        <div class="ai-info-row">
+          <span class="ai-label">Type:</span>
+          <span class="ai-value">Greedy + Priority Queue</span>
         </div>
-        <div class="algo-info-card" data-info="crp">
-          <div class="ai-title">🧩 CRP</div>
-          <div class="ai-complexity">O(B²) customization</div>
-          <div class="ai-desc">Customizable Route Planning. Partitions the graph into cells/regions. Precomputes boundary node paths; customization adapts to changing edge weights.</div>
-        </div>
-        <div class="algo-info-card" data-info="tabu">
-          <div class="ai-title">🚫 Tabu Search</div>
-          <div class="ai-complexity">O(n² × iter)</div>
-          <div class="ai-desc">Metaheuristic for TSP/VRP. Uses 2-opt swaps to improve tour. A tabu list prevents revisiting recent moves, escaping local optima.</div>
-        </div>
-        <div class="algo-info-card" data-info="aco">
-          <div class="ai-title">🐜 ACO</div>
-          <div class="ai-complexity">O(ants × n² × iter)</div>
-          <div class="ai-desc">Ant Colony Optimization. Multiple ants construct tours guided by pheromone trails. Good tours reinforce pheromones; trails evaporate over time.</div>
-        </div>
-      </div>
-    </section>
-
-    <!-- ======== ANALYTICS PANEL ======== -->
-    <section class="panel" id="panel-analytics">
-      <div class="analytics-grid">
-        <div class="card analytics-main">
-          <div class="card-header"><span>⏱️ Runtime Complexity Analysis</span></div>
-          <div class="complexity-chart-container">
-            <canvas id="complexityCanvas" width="720" height="340"></canvas>
-          </div>
-          <div class="complexity-legend">
-            <div class="legend-item2 merge">Merge Sort — O(n log n) Stable</div>
-            <div class="legend-item2 quick">Quick Sort — O(n log n) Unstable</div>
-            <div class="legend-item2 heap">Heap Sort — O(n log n) Unstable</div>
-            <div class="legend-item2 bubble">Bubble Sort — O(n²) Stable</div>
-          </div>
-        </div>
-        <div class="card analytics-side">
-          <div class="card-header"><span>📘 Stability Impact</span></div>
-          <div class="stability-demo" id="stability-demo">
-            <div class="stab-label">5 packages with same deadline — sorted by each algorithm:</div>
-            <div class="stab-row">
-              <div class="stab-algo stable-tag">Merge Sort (Stable)</div>
-              <div class="stab-items" id="stab-merge"></div>
-            </div>
-            <div class="stab-row">
-              <div class="stab-algo unstable-tag">Quick Sort (Unstable)</div>
-              <div class="stab-items" id="stab-quick"></div>
-            </div>
-            <div class="stab-note">⚠️ Stable sort preserves arrival order for equal deadlines — critical for delivery fairness.</div>
-          </div>
-          <div class="card-header mt"><span>🏷️ O(n²) vs O(n log n)</span></div>
-          <div class="complexity-compare" id="complexity-compare"></div>
-        </div>
+        <div class="ai-desc">Uses a priority queue to always explore the nearest unvisited node. Guarantees optimal shortest-path. Perfect for multi-level warehouse networks with real-world road distances. Processes through main hubs → regional centers → final sub-warehouses for efficient delivery routing.</div>
       </div>
     </section>
 
@@ -269,12 +208,10 @@
       </div>
       <div class="form-row">
         <label>Distance (km) <input type="number" id="f-distance" placeholder="e.g. 45.0" step="0.1"></label>
-        <label>Destination City
-          <select id="f-city">
-            <option>Mumbai</option><option>Delhi</option><option>Bangalore</option><option>Chennai</option>
-            <option>Hyderabad</option><option>Ahmedabad</option><option>Kolkata</option><option>Pune</option>
-          </select>
-        </label>
+        <label>Destination Address <input type="text" id="f-destination" placeholder="Click map to pick or type address"></label>
+      </div>
+      <div class="form-row">
+        <div class="field-note">Click a point on the Route Planner map to select the destination address automatically.</div>
       </div>
     </div>
     <div class="modal-footer">
@@ -285,6 +222,7 @@
 </div>
 
 <script src="routing_algorithms.js"></script>
-<script src="app.js?v=3"></script>
+<script src="warehouses.js"></script>
+<script src="app.js?v=4"></script>
 </body>
 </html>
